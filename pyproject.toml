@@ -13,8 +13,20 @@ dynamic = ["readme", "version"]
 license = {file = "LICENSE"}
 dependencies = [
     "caput @ git+https://github.com/radiocosmology/caput.git",
+    "bitshuffle",
     "h5py",
+    "mpi4py",
     "numpy >= 1.24",
+]
+
+[project.optional-dependencies]
+doc = [
+    "numpydoc",
+    "Sphinx",
+    "sphinx_rtd_theme",
+]
+test = [
+  "pytest >= 7.0"
 ]
 
 [tool.ruff]
@@ -30,3 +42,6 @@ readme = {file = ["README.md"], content-type = "text/markdown"}
 
 [tool.setuptools_scm]
 fallback_version = "0.1.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,5 +1,14 @@
 """
 General CHORD utilities
+
+Submodules
+==========
+
+.. autosummary::
+    :toctree: _autosummary
+
+    andata
+    rfi
 """
 
 from importlib.metadata import PackageNotFoundError, version
