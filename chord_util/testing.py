@@ -63,6 +63,7 @@ def _fengine_input(input_list, crs_board_remap):
         out.append(board * 8 + lane)
     return np.array(out)
 
+
 # ERA bin length (s) and a start time for the synthetic data
 BIN_S = 9.98244352
 T0_UNIX_NS = 1789189194185533750
@@ -200,7 +201,10 @@ def make_xengine_files(
         archive_of_file[-1] = 1
 
     applied = np.array(
-        [archives[a][freq_id][:, fengine_input].astype(np.complex128) for a in archive_of_file]
+        [
+            archives[a][freq_id][:, fengine_input].astype(np.complex128)
+            for a in archive_of_file
+        ]
     )
     dish = np.array(inputs["type"]) == INPUT_TYPE_DISH
     g0 = np.abs(applied[0][:, dish])
@@ -221,7 +225,9 @@ def make_xengine_files(
         it += nf
 
         abs_file_idx = 4224075 + fi
-        start = datetime.fromtimestamp(t_inst_ns[tsl][fill][0] * 1e-9 if nf else 0, tz=timezone.utc)
+        start = datetime.fromtimestamp(
+            t_inst_ns[tsl][fill][0] * 1e-9 if nf else 0, tz=timezone.utc
+        )
         fname = os.path.join(
             acq_dir,
             f"vis_{abs_file_idx:010d}_{start:%Y%m%d}T_{start:%H%M%S}_{start.microsecond * 1000:09d}.h5",
@@ -348,7 +354,10 @@ def _write_file(
     fh.attrs["dish_coelev_deg"] = -27.3
     fh.attrs["feed_positions_m"] = rng.uniform(0, 50, size=(ninput, 3))
     fh.attrs["main_array_grid_indices"] = np.array(
-        [[d % 8, d // 8] if t == 0 else [-1, -1] for d, t in zip(inputs["dish_idx"], inputs["type"])]
+        [
+            [d % 8, d // 8] if t == 0 else [-1, -1]
+            for d, t in zip(inputs["dish_idx"], inputs["type"])
+        ]
     )
     fh.attrs["digital_gains_source_file"] = "baseband_gains.h5"
 
@@ -356,30 +365,58 @@ def _write_file(
     im = fh.create_group("index_map")
     dset("index_map/freq", freq, ["frequency"])
     dset("index_map/prod", prod, ["product"])
-    dset("index_map/label", np.array(inputs["label"], dtype=h5py.string_dtype()), ["element"])
+    dset(
+        "index_map/label",
+        np.array(inputs["label"], dtype=h5py.string_dtype()),
+        ["element"],
+    )
     dset("index_map/type", np.array(inputs["type"], dtype=np.int32), ["element"])
     dset("index_map/pol", np.array(inputs["pol"], dtype=np.int32), ["element"])
-    dset("index_map/dish_idx", np.array(inputs["dish_idx"], dtype=np.int64), ["element"])
+    dset(
+        "index_map/dish_idx", np.array(inputs["dish_idx"], dtype=np.int64), ["element"]
+    )
     dset("index_map/grid_x_idx", np.array(inputs["dish_idx"]) % 8, ["element"])
     dset("index_map/grid_y_idx", np.array(inputs["dish_idx"]) // 8, ["element"])
     dset("index_map/coelev_disp_deg", np.zeros(ninput), ["element"])
     dset("index_map/feed_pos_disp_m", np.zeros((ninput, 3)), ["element", "xyz"])
-    dset("index_map/dish_positions_in_grid_coords", rng.uniform(0, 50, (64, 3)), ["dish", "xyz"])
+    dset(
+        "index_map/dish_positions_in_grid_coords",
+        rng.uniform(0, 50, (64, 3)),
+        ["dish", "xyz"],
+    )
     del im
 
     # Data
     dset("vis", vis, ["frequency", "product", "time"], compress=True)
     dset("vis_weight", weight, ["frequency", "product", "time"], compress=True)
     dset("flags", element_flags, ["frequency", "element", "time"])
-    dset("gain", np.full((nfreq, ninput, ntime), -1 + 0j, dtype=np.complex64),
-         ["frequency", "element", "time"])
-    dset("radiometer_chi2", np.full((nfreq, ntime, 3), -1, dtype=np.float32),
-         ["frequency", "time", "pol_product"])
-    dset("eval", rng.uniform(size=(nfreq, 2, ntime)).astype(np.float32),
-         ["frequency", "eigenval", "time"], compress=True)
-    dset("evec", (rng.normal(size=(nfreq, 2, ninput, ntime)) + 0j).astype(np.complex64),
-         ["frequency", "eigenvec", "element", "time"], compress=True)
-    dset("erms", rng.uniform(size=(nfreq, ntime)).astype(np.float32), ["frequency", "time"])
+    dset(
+        "gain",
+        np.full((nfreq, ninput, ntime), -1 + 0j, dtype=np.complex64),
+        ["frequency", "element", "time"],
+    )
+    dset(
+        "radiometer_chi2",
+        np.full((nfreq, ntime, 3), -1, dtype=np.float32),
+        ["frequency", "time", "pol_product"],
+    )
+    dset(
+        "eval",
+        rng.uniform(size=(nfreq, 2, ntime)).astype(np.float32),
+        ["frequency", "eigenval", "time"],
+        compress=True,
+    )
+    dset(
+        "evec",
+        (rng.normal(size=(nfreq, 2, ninput, ntime)) + 0j).astype(np.complex64),
+        ["frequency", "eigenvec", "element", "time"],
+        compress=True,
+    )
+    dset(
+        "erms",
+        rng.uniform(size=(nfreq, ntime)).astype(np.float32),
+        ["frequency", "time"],
+    )
 
     # Data quality
     frame_length = 1949696
@@ -416,12 +453,24 @@ def _write_file(
         ("rfi_frame_excision_num", np.zeros(ntime, dtype=np.int32)),
     ]:
         dset(name, arr, ["time"])
-    dset("rfi_frame_excision_threshold", np.zeros((ntime, 8), np.float32), ["time", "threshold"])
-    dset("rfi_frame_excision_fraction", np.zeros((ntime, 8), np.float32), ["time", "threshold"])
+    dset(
+        "rfi_frame_excision_threshold",
+        np.zeros((ntime, 8), np.float32),
+        ["time", "threshold"],
+    )
+    dset(
+        "rfi_frame_excision_fraction",
+        np.zeros((ntime, 8), np.float32),
+        ["time", "threshold"],
+    )
 
     # A beamformer mask with its own time axis, which readers should ignore
     fh.create_group("bf_mask")
-    dset("bf_mask/mask", np.ones((7, 2, 2, 64), dtype=np.int8), ["time", "stream", "pol", "dish"])
+    dset(
+        "bf_mask/mask",
+        np.ones((7, 2, 2, 64), dtype=np.int8),
+        ["time", "stream", "pol", "dish"],
+    )
 
     # Configuration snapshots, the second one (receiver) optionally recording the
     # CRS board remap
@@ -447,11 +496,14 @@ def _write_file(
     dg.create_dataset("gain_exp", data=gain_exp)
     dg.create_dataset("compute_time", data=np.full((1, N_GAIN_INPUT), 1.7e9))
     dg.create_dataset(
-        "update_id", data=np.array([f"digitalgain_update{update}"], dtype=h5py.string_dtype())
+        "update_id",
+        data=np.array([f"digitalgain_update{update}"], dtype=h5py.string_dtype()),
     )
     dg.create_group("index_map")
     dg.create_dataset("index_map/freq", data=gain_freq)
-    gin = np.empty(N_GAIN_INPUT, dtype=[("chan_id", "<u2"), ("correlator_input", "S32")])
+    gin = np.empty(
+        N_GAIN_INPUT, dtype=[("chan_id", "<u2"), ("correlator_input", "S32")]
+    )
     gin["chan_id"] = np.arange(N_GAIN_INPUT)
     gin["correlator_input"] = [f"test{i:06d}".encode() for i in range(N_GAIN_INPUT)]
     dg.create_dataset("index_map/input", data=gin)

@@ -52,7 +52,9 @@ def test_digital_gain_input():
     assert fin.tolist() == [0, 7, 16, 23, 120, 127, 8, 15, 24, 112, 119]
 
     identity = list(range(16))
-    assert andata.digital_gain_input(np.arange(128), identity).tolist() == list(range(128))
+    assert andata.digital_gain_input(np.arange(128), identity).tolist() == list(
+        range(128)
+    )
 
 
 def test_get_crs_board_remap(files, tmp_path):
@@ -62,7 +64,9 @@ def test_get_crs_board_remap(files, tmp_path):
     # Not recorded
     fname = tmp_path / "noremap.h5"
     with h5py.File(fname, "w") as fh:
-        fh["config_json"] = np.array([json.dumps({"config": {}})], dtype=h5py.string_dtype())
+        fh["config_json"] = np.array(
+            [json.dumps({"config": {}})], dtype=h5py.string_dtype()
+        )
     with h5py.File(fname, "r") as fh:
         assert andata.get_crs_board_remap(fh) is None
 
@@ -70,7 +74,9 @@ def test_get_crs_board_remap(files, tmp_path):
     with h5py.File(fname, "w") as fh:
         snaps = [
             json.dumps({"config": {"dpdk": {"crs_board_remap": list(range(16))}}}),
-            json.dumps({"config": {"dpdk": {"crs_board_remap": list(range(16))[::-1]}}}),
+            json.dumps(
+                {"config": {"dpdk": {"crs_board_remap": list(range(16))[::-1]}}}
+            ),
         ]
         fh["config_json"] = np.array(snaps, dtype=h5py.string_dtype())
     with h5py.File(fname, "r") as fh, pytest.raises(andata.AnDataError):
@@ -118,7 +124,9 @@ def test_unfilled_bins_dropped_and_times(data, truth):
     np.testing.assert_allclose(data.timestamp, data.time)
     assert np.all(np.diff(data.time) > 0)
     np.testing.assert_array_equal(data["file_index"][:], truth["file_index"])
-    np.testing.assert_allclose(data["time_center_t_inst_ns"][:] * 1e-9, data.time, atol=1e-6)
+    np.testing.assert_allclose(
+        data["time_center_t_inst_ns"][:] * 1e-9, data.time, atol=1e-6
+    )
 
 
 def test_gains_divided_out(data, truth):
@@ -143,11 +151,15 @@ def test_missing_samples_zero_weight(data, truth):
 
 
 def test_flags(data, truth):
-    np.testing.assert_array_equal(data.flags["element_flags"][:], truth["element_flags"])
+    np.testing.assert_array_equal(
+        data.flags["element_flags"][:], truth["element_flags"]
+    )
     np.testing.assert_array_equal(data.input_flags[:], truth["input_flags"])
     for name in andata.FREQ_TIME_FLAGS:
         assert data.flags[name].shape == (data.nfreq, data.ntime)
-    np.testing.assert_array_equal(data.frac_lost[:] >= 1, truth["missing"] & (data.frac_lost[:] >= 1))
+    np.testing.assert_array_equal(
+        data.frac_lost[:] >= 1, truth["missing"] & (data.frac_lost[:] >= 1)
+    )
 
 
 def test_index_maps(data, truth):
@@ -162,8 +174,12 @@ def test_index_maps(data, truth):
 
 def test_input_info(data, truth):
     np.testing.assert_array_equal(data.input_type, truth["input_type"])
-    np.testing.assert_array_equal(data.is_dish, truth["input_type"] == andata.INPUT_TYPE_DISH)
-    np.testing.assert_array_equal(data.is_rfi_monitor, truth["input_type"] == andata.INPUT_TYPE_RFI)
+    np.testing.assert_array_equal(
+        data.is_dish, truth["input_type"] == andata.INPUT_TYPE_DISH
+    )
+    np.testing.assert_array_equal(
+        data.is_rfi_monitor, truth["input_type"] == andata.INPUT_TYPE_RFI
+    )
     for name in andata.INPUT_TABLES + andata.INPUT_ATTRS:
         assert data.input_info[name].shape[0] == data.ninput
 
@@ -194,7 +210,9 @@ def test_file_order_and_input_forms(files, data):
     np.testing.assert_array_equal(shuffled.vis[:], data.vis[:])
 
     pattern = os.path.join(os.path.dirname(files[0]), "vis_*.h5")
-    np.testing.assert_array_equal(andata.CorrData.from_acq_h5(pattern).vis[:], data.vis[:])
+    np.testing.assert_array_equal(
+        andata.CorrData.from_acq_h5(pattern).vis[:], data.vis[:]
+    )
 
     with h5py.File(files[0], "r") as f0, h5py.File(files[1], "r") as f1:
         two = andata.CorrData.from_acq_h5([f0, f1])
@@ -247,7 +265,9 @@ def test_gains_change_between_files(tmp_path):
 
 
 def test_layout_mismatch(files, tmp_path):
-    other, _ = testing.make_xengine_files(tmp_path, nfreq=8, nfile=1, acquisition="acq_other")
+    other, _ = testing.make_xengine_files(
+        tmp_path, nfreq=8, nfile=1, acquisition="acq_other"
+    )
     with pytest.raises(andata.AnDataError):
         andata.CorrData.from_acq_h5([files[0], other[0]])
 
@@ -272,7 +292,8 @@ def test_unknown_kwarg(files):
 
 
 @pytest.mark.parametrize(
-    "freq_sel", [slice(2, 10), slice(1, 15, 3), [0, 4, 5, 11], np.arange(16) % 2 == 0, 7]
+    "freq_sel",
+    [slice(2, 10), slice(1, 15, 3), [0, 4, 5, 11], np.arange(16) % 2 == 0, 7],
 )
 def test_freq_sel(files, data, freq_sel):
     sub = andata.CorrData.from_acq_h5(files, freq_sel=freq_sel)
@@ -288,7 +309,9 @@ def test_time_range(files, data, start, stop):
     sub = andata.CorrData.from_acq_h5(files, start=start, stop=stop)
     np.testing.assert_array_equal(sub.vis[:], data.vis[:][..., start:stop])
     np.testing.assert_array_equal(sub.time, data.time[start:stop])
-    np.testing.assert_array_equal(sub["bin_ERA_deg"][:], data["bin_ERA_deg"][start:stop])
+    np.testing.assert_array_equal(
+        sub["bin_ERA_deg"][:], data["bin_ERA_deg"][start:stop]
+    )
 
 
 def test_input_sel(files, data, truth):
@@ -305,7 +328,9 @@ def test_input_sel(files, data, truth):
     pmap = [index[(sub_labels[a], sub_labels[b])] for a, b in sub.prod]
     np.testing.assert_array_equal(sub.vis[:], data.vis[:][:, pmap])
     np.testing.assert_array_equal(sub.weight[:], data.weight[:][:, pmap])
-    np.testing.assert_array_equal(sub.flags["element_flags"][:], data.flags["element_flags"][:][:, isel])
+    np.testing.assert_array_equal(
+        sub.flags["element_flags"][:], data.flags["element_flags"][:][:, isel]
+    )
     np.testing.assert_array_equal(sub.digital_gain[:], data.digital_gain[:][:, isel])
 
 
@@ -325,7 +350,9 @@ def test_prod_and_stack_sel(files, data):
 
 def test_datasets_sel(files):
     sub = andata.CorrData.from_acq_h5(files, datasets=["vis", "vis_weight", "gain"])
-    assert "vis" in sub.datasets and "vis_weight" in sub.flags and "gain" in sub.datasets
+    assert (
+        "vis" in sub.datasets and "vis_weight" in sub.flags and "gain" in sub.datasets
+    )
     assert np.all(sub.gain[:] == -1)
     assert "eval" not in sub and "flags/frac_lost" not in sub
     # The per-time and per-input datasets are always read
@@ -342,7 +369,9 @@ def test_save_and_load(data, tmp_path):
     assert isinstance(back, andata.CorrData)
     np.testing.assert_array_equal(back.vis[:], data.vis[:])
     np.testing.assert_array_equal(back.weight[:], data.weight[:])
-    np.testing.assert_array_equal(back.input_info["type"][:], data.input_info["type"][:])
+    np.testing.assert_array_equal(
+        back.input_info["type"][:], data.input_info["type"][:]
+    )
 
     # BaseData.from_acq_h5 concatenates files already in analysis format
     cat = andata.BaseData.from_acq_h5([fname, fname])
@@ -397,7 +426,9 @@ def test_reader_freq(reader, data):
 def test_reader_inputs_and_prods(reader, data, truth):
     reader.select_input_type("dish")
     dish = reader.read()
-    assert dish.labels.tolist() == [lbl for lbl, t in zip(truth["labels"], truth["input_type"]) if t == 0]
+    assert dish.labels.tolist() == [
+        lbl for lbl, t in zip(truth["labels"], truth["input_type"]) if t == 0
+    ]
 
     reader.select_input_type("rfi")
     assert reader.read().is_rfi_monitor.all()

@@ -1320,7 +1320,11 @@ class CorrReader(tod.TODReader):
             step = max(int(freq_step // df), 1)
         # Unlike CHIME, frequencies are in increasing order.
         start = 0 if freq_low is None else int(np.searchsorted(freq, freq_low))
-        stop = nfreq if freq_high is None else int(np.searchsorted(freq, freq_high, "right"))
+        stop = (
+            nfreq
+            if freq_high is None
+            else int(np.searchsorted(freq, freq_high, "right"))
+        )
         self.freq_sel = np.s_[start:stop:step]
 
     def select_freq_physical(self, frequencies):
@@ -1768,7 +1772,9 @@ def andata_from_xengine(
         np.arange(info["time_datasets"]["rfi_frame_excision_threshold"].shape[1]),
     )
     data.create_index_map("config", np.arange(len(info["config_json"])))
-    data.create_index_map("file", np.array([os.path.basename(f) for f in info["files"]]))
+    data.create_index_map(
+        "file", np.array([os.path.basename(f) for f in info["files"]])
+    )
     if "eval" in arrays or "evec" in arrays:
         data.create_index_map("ev", np.arange(info["n_ev"]))
     if "radiometer_chi2" in arrays:
@@ -1869,7 +1875,9 @@ def _scan_xengine_files(files, normalise_gain=True, crs_board_remap=None):
                     "abs_file_idx": int(fh.attrs["abs_file_idx"]),
                     "time_datasets": {name: fh[name][:] for name in TIME_DATASETS},
                     "prod": fh["index_map/prod"][:],
-                    "label": [typeutils.bytes_to_unicode(x) for x in fh["index_map/label"][:]],
+                    "label": [
+                        typeutils.bytes_to_unicode(x) for x in fh["index_map/label"][:]
+                    ],
                     "freq": fh["index_map/freq"][:],
                     "gain_key": _digital_gain_key(fh),
                 }
@@ -1894,7 +1902,9 @@ def _scan_xengine_files(files, normalise_gain=True, crs_board_remap=None):
     # Keep only the filled time bins
     valid = [i["time_datasets"]["time_center_t_inst_ns"] != 0 for i in per_file]
     time_datasets = {
-        name: np.concatenate([i["time_datasets"][name][v] for i, v in zip(per_file, valid)])
+        name: np.concatenate(
+            [i["time_datasets"][name][v] for i, v in zip(per_file, valid)]
+        )
         for name in TIME_DATASETS
     }
     t_ns = time_datasets["time_center_t_inst_ns"]
@@ -1904,7 +1914,9 @@ def _scan_xengine_files(files, normalise_gain=True, crs_board_remap=None):
         raise AnDataError("Times are not strictly increasing across the files.")
 
     with h5py.File(files[0], "r") as fh:
-        attrs = {k: fh.attrs[k] for k in fh.attrs if k not in INPUT_ATTRS + ("input_list",)}
+        attrs = {
+            k: fh.attrs[k] for k in fh.attrs if k not in INPUT_ATTRS + ("input_list",)
+        }
         input_list = fh.attrs["input_list"][:]
         input_tables = {name: fh["index_map"][name][:] for name in INPUT_TABLES}
         input_tables["label"] = np.array(
@@ -1915,7 +1927,9 @@ def _scan_xengine_files(files, normalise_gain=True, crs_board_remap=None):
         dish_positions = fh["index_map/dish_positions_in_grid_coords"][:]
         config_json = [bytes(x) for x in fh["config_json"][:]]
         available = [name for name, (raw, _) in CORR_DATASETS.items() if raw in fh]
-        dtypes = {name: fh[raw].dtype for name, (raw, _) in CORR_DATASETS.items() if raw in fh}
+        dtypes = {
+            name: fh[raw].dtype for name, (raw, _) in CORR_DATASETS.items() if raw in fh
+        }
         n_ev = fh["eval"].shape[1] if "eval" in fh else 0
         has_gains = "digital_gains" in fh
         file_remap = get_crs_board_remap(fh)
