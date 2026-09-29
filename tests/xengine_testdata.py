@@ -1,14 +1,15 @@
-"""Tools for testing code that reads CHORD X-engine data.
+"""Lightweight synthetic X-engine data for the tests.
 
-:func:`make_xengine_files` writes small, synthetic X-engine files with the same
-layout as the files from kotekan's ``hdf5N2Write`` (CHORD mode), together with
-the "true" data they were made from, so that readers can be checked against a
-known answer without access to real data.
+:func:`make_xengine_files` writes small X-engine files with the same layout as
+the files from kotekan's ``hdf5N2Write`` (CHORD mode), together with the "true"
+data they were made from, so that the readers can be checked against a known
+answer without access to real data.
 
 Examples
 --------
->>> from chord_util import andata, testing
->>> files, truth = testing.make_xengine_files(tmp_path)
+>>> import xengine_testdata
+>>> from chord_util import andata
+>>> files, truth = xengine_testdata.make_xengine_files(tmp_path)
 >>> data = andata.CorrData.from_acq_h5(files)
 >>> np.allclose(data.vis[:] / data.attrs["digital_gain_norm"] ** 2, truth["vis"])
 True
@@ -24,7 +25,7 @@ import h5py
 import numpy as np
 from bitshuffle import h5 as bshufh5
 
-from .andata import CRS_BOARD_REMAP, INPUT_TYPE_DISH
+from chord_util.andata import CRS_BOARD_REMAP, INPUT_TYPE_DISH
 
 # Channel width and index of the first science channel, as for the pathfinder
 CHANNEL_WIDTH_MHZ = 3200.0 / 16384

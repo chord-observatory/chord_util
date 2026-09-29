@@ -33,7 +33,7 @@ are in `chord_pipeline.core.io`.
 
 ## Tests
 
-The tests use small synthetic X-engine files made by `chord_util.testing`
+The tests use small synthetic X-engine files made by `tests/xengine_testdata.py`
 (no real data needed):
 
 ```sh
@@ -41,6 +41,3 @@ pip install -e ".[test]"
 python -m pytest            # serial
 mpirun -np 3 python -m pytest   # distributed reads under MPI
 ```
-
-`chord_util.testing.make_xengine_files` can also be used by other packages to
-test code that reads X-engine data.

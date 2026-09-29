@@ -7,7 +7,8 @@ import h5py
 import numpy as np
 import pytest
 
-from chord_util import andata, testing
+import xengine_testdata as testing
+from chord_util import andata
 
 
 @pytest.fixture(scope="module")
