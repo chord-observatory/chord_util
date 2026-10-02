@@ -13,6 +13,7 @@ dynamic = ["readme", "version"]
 license = {file = "LICENSE"}
 dependencies = [
     "caput @ git+https://github.com/radiocosmology/caput.git",
+    "chord_ephem @ git+https://github.com/chord-observatory/chord_ephem.git",
     "bitshuffle",
     "h5py",
     "mpi4py",
