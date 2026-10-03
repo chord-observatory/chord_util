@@ -19,21 +19,34 @@ Times to treat with care
 - :py:meth:`guess_fwhm`
 - :py:meth:`daytime_flag`
 - :py:meth:`transit_flag`
+- :py:meth:`bright_source_flag`
+
+Masks from the data
+
+- :py:meth:`mask_1d`
+- :py:meth:`mad_sumthreshold_mask`
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
+from caput.algorithms import median
 from caput.astro import time as ctime
-from caput.astro.skyfield import unix_to_skyfield_time
+from caput.astro.skyfield import skyfield_wrapper, unix_to_skyfield_time
 
 if TYPE_CHECKING:
     from caput.astro.observer import Observer
 
+logger = logging.getLogger(__name__)
+
 # Speed of light in m/s
 _C = 299792458.0
+
+# Ratio of the standard deviation to the median absolute deviation of a Gaussian
+MAD_TO_RMS = 1.4826
 
 # Ranges of bad frequencies, given by their start and end times (UNIX time, None
 # for no limit) and their start and end frequencies (MHz).
@@ -299,3 +312,274 @@ def transit_flag(
             flag |= (time >= ttrans - window) & (time <= ttrans + window)
 
     return flag
+
+
+def bright_source_flag(
+    time: np.ndarray,
+    freq: np.ndarray,
+    sources: tuple[str, ...] = ("CAS_A", "CYG_A", "TAU_A", "B0329+54"),
+    nsigma_source: float = 1.0,
+    nsigma_sun: float = 3.0,
+    obs: Observer | None = None,
+) -> np.ndarray:
+    """Flag the times when the Sun or a bright source is transiting.
+
+    Used to switch from SumThreshold to the MAD flagger around transits,
+    where SumThreshold would remove real sky signal (as in
+    `ch_pipeline.analysis.flagging.RFISensitivityMask`).
+
+    Parameters
+    ----------
+    time : np.ndarray[ntime]
+        UNIX times.
+    freq : np.ndarray[nfreq]
+        Frequencies in MHz.
+    sources : tuple of str
+        Names of sources in `chord_ephem.sources.source_dictionary`.
+    nsigma_source, nsigma_sun : float
+        Half-width of the flagged window around the transits of the sources
+        and of the Sun, in beam sigmas.
+    obs : Observer, optional
+        The observer. Default CHORD.
+
+    Returns
+    -------
+    flag : np.ndarray[nfreq, ntime]
+        True within the transit windows.
+    """
+    from chord_ephem.sources import source_dictionary
+
+    freq = np.asarray(freq)
+    bodies = [(source_dictionary[src], nsigma_source) for src in sources]
+    bodies.append((skyfield_wrapper.ephemeris["sun"], nsigma_sun))
+
+    flag = np.zeros((freq.size, np.size(time)), dtype=bool)
+    for body, nsigma in bodies:
+        flag |= transit_flag(body, time, nsigma=nsigma, freq=freq, obs=obs)
+    return flag
+
+
+def mask_1d(
+    y: np.ndarray,
+    flag: np.ndarray,
+    nsigma: float = 5.0,
+    quantile: float = 0.15,
+    win_f: int | None = 191,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Flag whole frequency channels from a low quantile over time.
+
+    The quantile over time of each channel is compared with its moving
+    weighted median over `win_f` channels; channels deviating by more than
+    `nsigma` times the (moving) MAD-derived standard deviation are flagged.
+    This is the 1D stage of `draco.analysis.flagging.RFISensitivityMask`.
+
+    Parameters
+    ----------
+    y : np.ndarray[nfreq, ntime]
+        Data.
+    flag : np.ndarray[nfreq, ntime]
+        True for samples to ignore.
+    nsigma : float
+        Threshold in standard deviations.
+    quantile : float
+        Quantile over time to use, e.g. 0.15 to be robust to intermittent RFI.
+    win_f : int or None
+        Number of channels in the moving median. None for a single median
+        over all frequencies.
+
+    Returns
+    -------
+    flag_1d : np.ndarray[nfreq]
+        True for flagged channels.
+    y_static : np.ndarray[nfreq]
+        The quantile over time of each channel, to subtract from the data.
+    """
+    y = np.ascontiguousarray(y, dtype=np.float64)
+    w = np.ascontiguousarray(~flag, dtype=np.float64)
+
+    medt_y = median.quantile(y, w, quantile)
+    medt_w = np.any(w, axis=-1).astype(np.float64)
+
+    def _median(x):
+        if win_f is None:
+            return median.weighted_median(x, medt_w)
+        return median.moving_weighted_median(x, medt_w, win_f)
+
+    absd = np.abs(medt_y - _median(medt_y))
+    mad_1d = MAD_TO_RMS * _median(absd)
+
+    return absd > nsigma * mad_1d, medt_y
+
+
+def mad_sumthreshold_mask(
+    y: np.ndarray,
+    flag: np.ndarray,
+    freq: np.ndarray,
+    mask_type: str = "mad",
+    madtimes: np.ndarray | None = None,
+    nsigma_1d: float | None = 5.0,
+    quantile_1d: float = 0.15,
+    win_f_1d: int | None = 191,
+    nsigma: float = 5.0,
+    niter: int = 5,
+    rho: float = 1.5,
+    base_size: tuple[int, int] = (37, 181),
+    mad_size: tuple[int, int] = (101, 31),
+    tv_fraction: float | None = None,
+    max_m: int = 64,
+    sir_eta: float = 0.2,
+    return_stats: bool = False,
+) -> np.ndarray | tuple[np.ndarray, list[dict]]:
+    """Make an RFI mask from a (freq, time) array with MAD and SumThreshold.
+
+    The algorithm of `draco.analysis.flagging.RFISensitivityMask`, as a
+    function of an array so that it can be applied to any data, e.g. the
+    dish x RFI-monitor correlation:
+
+    1. optionally flag channels with `mask_1d` and subtract their quantile
+       over time;
+    2. for thresholds decreasing as ``nsigma * rho**k`` (k = niter-1, ..., 0):
+       estimate the background with a 2D moving median of size `base_size`,
+       the noise with 1.4826 times the 2D moving median of the absolute
+       residual over `mad_size`, and flag samples whose residual exceeds the
+       threshold (MAD), or run SumThreshold on the residual, or both
+       (`mask_type`).
+
+    Parameters
+    ----------
+    y : np.ndarray[nfreq, ntime]
+        Real data, e.g. |V| or |r|.
+    flag : np.ndarray[nfreq, ntime]
+        Initial flag (True = ignore): missing data and the static mask.
+    freq : np.ndarray[nfreq]
+        Frequencies in MHz.
+    mask_type : {"mad", "sumthreshold", "combine"}
+        "combine" uses MAD where `madtimes` is True and SumThreshold elsewhere,
+        and extends the SumThreshold mask in time with SIR across those times.
+    madtimes : np.ndarray[nfreq, ntime], optional
+        Where to use MAD for "combine", e.g. from `bright_source_flag`.
+    nsigma_1d, quantile_1d, win_f_1d
+        Parameters of the 1D stage (`mask_1d`); `nsigma_1d=None` skips it.
+    nsigma : float
+        Final threshold in standard deviations.
+    niter : int
+        Number of iterations.
+    rho : float
+        Factor by which the threshold drops at each iteration.
+    base_size, mad_size : (int, int)
+        (channels, times) of the moving medians for the background and the
+        noise.
+    tv_fraction : float, optional
+        If given, also flag whole 6 MHz TV channels where more than this
+        fraction of the samples exceed the threshold
+        (`draco.analysis.flagging.tv_channels_flag`). Default None (off).
+    max_m : int
+        Largest SumThreshold window.
+    sir_eta : float
+        Aggressiveness of SIR for "combine".
+    return_stats : bool
+        Also return the percentage flagged after each stage.
+
+    Returns
+    -------
+    mask : np.ndarray[nfreq, ntime]
+        True for flagged samples, including the initial `flag`.
+    stats : list of dict
+        If `return_stats`: for each stage, the percentage of samples that the
+        stage would flag (``candidate``), newly flags (``added``) and the
+        total flagged after it (``total``).
+    """
+    from draco.util import rfi as drfi
+
+    if mask_type not in ("mad", "sumthreshold", "combine"):
+        raise ValueError(f"Unknown mask_type {mask_type!r}")
+    if mask_type == "combine" and madtimes is None:
+        raise ValueError('mask_type "combine" needs madtimes')
+
+    y = np.array(y, dtype=np.float64)
+    current = np.array(flag, dtype=bool)
+    stats = []
+
+    def _record(stage, threshold, candidate):
+        # Percentages flagged by a stage, before it is added to `current`
+        return {
+            "stage": stage,
+            "threshold": threshold,
+            "candidate": 100.0 * candidate.mean(),
+            "added": 100.0 * (candidate & ~current).mean(),
+        }
+
+    stats.append(
+        {
+            "stage": "initial",
+            "threshold": None,
+            "candidate": 100.0 * current.mean(),
+            "added": 100.0 * current.mean(),
+            "total": 100.0 * current.mean(),
+        }
+    )
+
+    if nsigma_1d is not None:
+        flag_1d, y_static = mask_1d(y, current, nsigma_1d, quantile_1d, win_f_1d)
+        flag_1d = np.broadcast_to(flag_1d[:, np.newaxis], y.shape)
+        entry = _record("1d", nsigma_1d, flag_1d)
+        current |= flag_1d
+        y -= y_static[:, np.newaxis]
+        entry["total"] = 100.0 * current.mean()
+        stats.append(entry)
+
+    for threshold in nsigma * rho ** np.arange(niter)[::-1]:
+        background = median.moving_weighted_median(
+            y, np.ascontiguousarray(~current, dtype=np.float64), base_size
+        )
+        dy = y - background
+        ady = np.abs(dy)
+        sigma = MAD_TO_RMS * median.moving_weighted_median(
+            ady, np.ascontiguousarray(~current, dtype=np.float64), mad_size
+        )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ady_nsigma = np.where(sigma > 0, ady / sigma, 0.0)
+
+        madmask = ady_nsigma > threshold
+        tvmask = np.zeros_like(madmask)
+        if tv_fraction is not None:
+            from draco.analysis.flagging import tv_channels_flag
+
+            tvmask = tv_channels_flag(ady_nsigma, freq, sigma=threshold, f=tv_fraction)
+            madmask |= tvmask
+
+        if mask_type == "mad":
+            new = madmask
+        else:
+            stmask = drfi.sumthreshold(
+                dy,
+                max_m,
+                start_flag=current | tvmask,
+                threshold1=threshold,
+                remove_median=False,
+                correct_for_missing=True,
+                rho=1.0,
+                variance=sigma**2,
+            )
+            if mask_type == "sumthreshold":
+                new = stmask
+            else:
+                new = np.where(madtimes, madmask, stmask)
+                expanded = drfi.scale_invariant_rank(new, eta=sir_eta, axis=-1)
+                new = np.where(madtimes, expanded, new)
+
+        entry = _record(f"{mask_type} {threshold:.3g}", threshold, new)
+        current |= new
+        entry["total"] = 100.0 * current.mean()
+        stats.append(entry)
+        logger.info(
+            "threshold %.3g: candidate %.2f%%, added %.2f%%, total %.2f%%",
+            threshold,
+            entry["candidate"],
+            entry["added"],
+            entry["total"],
+        )
+
+    if return_stats:
+        return current, stats
+    return current

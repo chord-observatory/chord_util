@@ -113,3 +113,108 @@ def test_transit_flag():
     # The Sun does not transit during the night
     sun = skyfield_wrapper.ephemeris["sun"]
     assert not rfi.transit_flag(sun, time).any()
+
+
+def _synthetic(seed=0):
+    """Smooth background plus noise, with a bad channel, a burst and a weak blob."""
+    rng = np.random.default_rng(seed)
+    nfreq, ntime = 256, 600
+    freq = np.linspace(600.0, 650.0, nfreq)
+    f, t = np.meshgrid(
+        np.linspace(0, 1, nfreq), np.linspace(0, 1, ntime), indexing="ij"
+    )
+    # Flat across frequency, like data normalised by their bandpass
+    y = 1.0 + 0.1 * np.sin(2 * np.pi * t) + 0.0 * f
+    y += 0.01 * rng.standard_normal((nfreq, ntime))
+
+    rfi_in = np.zeros_like(y, dtype=bool)
+    y[50] += 0.5  # always-on channel
+    rfi_in[50] = True
+    y[100:110, 200:210] += 0.2  # bright burst, 20 sigma
+    rfi_in[100:110, 200:210] = True
+    y[150:154, 300:312] += 0.03  # weak blob, 3 sigma per sample, smaller than base_size
+    rfi_in[150:154, 300:312] = True
+    return y, freq, rfi_in
+
+
+SMALL = {"win_f_1d": 31, "base_size": (9, 31), "mad_size": (21, 15), "max_m": 16}
+
+
+def test_mask_1d():
+    y, _, _ = _synthetic()
+    flag_1d, y_static = rfi.mask_1d(y, np.zeros_like(y, dtype=bool), win_f=31)
+    assert flag_1d.shape == y_static.shape == (y.shape[0],)
+    assert flag_1d[50]
+    assert flag_1d.sum() <= 2
+
+
+def test_mask_1d_bandpass_slope():
+    # A known limitation: with a bandpass slope larger than the noise per
+    # channel, the moving median tracks the data, the MAD collapses and many
+    # clean channels are flagged. Normalise the bandpass before flagging.
+    y, _, _ = _synthetic()
+    y = y + 0.3 * np.linspace(0, 1, y.shape[0])[:, None]
+    flag_1d, _ = rfi.mask_1d(y, np.zeros_like(y, dtype=bool), win_f=31)
+    assert flag_1d.sum() > 10
+
+
+@pytest.mark.parametrize("mask_type", ["mad", "sumthreshold"])
+def test_mad_sumthreshold_mask(mask_type):
+    y, freq, rfi_in = _synthetic()
+    flag = np.zeros_like(y, dtype=bool)
+    flag[:, :5] = True  # missing data stays flagged
+
+    mask, stats = rfi.mad_sumthreshold_mask(
+        y, flag, freq, mask_type=mask_type, return_stats=True, **SMALL
+    )
+
+    assert mask.shape == y.shape
+    assert mask[:, :5].all()
+    assert mask[50].all()
+    assert mask[100:110, 200:210].mean() > 0.95
+    # False positives outside the injected RFI and the initial flag
+    clean = ~rfi_in & ~flag
+    assert mask[clean].mean() < 0.01
+
+    # Only SumThreshold finds most of the weak blob
+    blob = mask[150:154, 300:312].mean()
+    if mask_type == "sumthreshold":
+        assert blob > 0.5
+    else:
+        assert blob < 0.2
+
+    # Stats: initial, 1d, then one entry per iteration, with a growing total
+    assert [s["stage"] for s in stats[:2]] == ["initial", "1d"]
+    assert len(stats) == 2 + 5
+    totals = [s["total"] for s in stats]
+    assert totals == sorted(totals)
+    assert totals[-1] == pytest.approx(100 * mask.mean())
+
+
+def test_mad_sumthreshold_combine():
+    y, freq, _ = _synthetic()
+    flag = np.zeros_like(y, dtype=bool)
+
+    # MAD around the blob's times, SumThreshold elsewhere
+    madtimes = np.zeros_like(flag)
+    madtimes[:, 280:380] = True
+    mask = rfi.mad_sumthreshold_mask(
+        y, flag, freq, mask_type="combine", madtimes=madtimes, **SMALL
+    )
+    st = rfi.mad_sumthreshold_mask(y, flag, freq, mask_type="sumthreshold", **SMALL)
+    assert mask[100:110, 200:210].mean() > 0.95
+    assert mask[150:154, 300:312].mean() < st[150:154, 300:312].mean()
+
+    with pytest.raises(ValueError, match="madtimes"):
+        rfi.mad_sumthreshold_mask(y, flag, freq, mask_type="combine")
+    with pytest.raises(ValueError, match="Unknown mask_type"):
+        rfi.mad_sumthreshold_mask(y, flag, freq, mask_type="median")
+
+
+def test_bright_source_flag():
+    time = T0 + 10.0 * np.arange(4645)
+    freq = np.array([400.0, 800.0])
+    flag = rfi.bright_source_flag(time, freq, sources=("CYG_A",))
+    assert flag.shape == (2, time.size)
+    assert flag[0].sum() > flag[1].sum() > 0
+    assert not rfi.bright_source_flag(time, freq, sources=()).any()  # no Sun at night

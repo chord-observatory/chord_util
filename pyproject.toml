@@ -26,6 +26,10 @@ doc = [
     "Sphinx",
     "sphinx_rtd_theme",
 ]
+rfi = [
+    # SumThreshold and SIR, used by chord_util.rfi.mad_sumthreshold_mask
+    "draco @ git+https://github.com/radiocosmology/draco.git",
+]
 test = [
   "pytest >= 7.0"
 ]
