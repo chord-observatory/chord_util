@@ -218,3 +218,15 @@ def test_bright_source_flag():
     assert flag.shape == (2, time.size)
     assert flag[0].sum() > flag[1].sum() > 0
     assert not rfi.bright_source_flag(time, freq, sources=()).any()  # no Sun at night
+
+
+def test_mad_sumthreshold_nan():
+    y, freq, _ = _synthetic()
+    y[:, 400:410] = np.nan
+    flag = np.zeros_like(y, dtype=bool)
+    ref = rfi.mad_sumthreshold_mask(
+        np.nan_to_num(y), flag | ~np.isfinite(y), freq, **SMALL
+    )
+    mask = rfi.mad_sumthreshold_mask(y, flag, freq, **SMALL)
+    assert mask[:, 400:410].all()
+    assert np.array_equal(mask, ref)

@@ -451,6 +451,7 @@ def mad_sumthreshold_mask(
         Real data, e.g. |V| or |r|.
     flag : np.ndarray[nfreq, ntime]
         Initial flag (True = ignore): missing data and the static mask.
+        Non-finite samples of `y` are also flagged.
     freq : np.ndarray[nfreq]
         Frequencies in MHz.
     mask_type : {"mad", "sumthreshold", "combine"}
@@ -497,7 +498,10 @@ def mad_sumthreshold_mask(
         raise ValueError('mask_type "combine" needs madtimes')
 
     y = np.array(y, dtype=np.float64)
-    current = np.array(flag, dtype=bool)
+    # Non-finite samples are flagged, and zeroed so they can't leak into the
+    # weighted medians
+    current = np.array(flag, dtype=bool) | ~np.isfinite(y)
+    y[current] = 0.0
     stats = []
 
     def _record(stage, threshold, candidate):
