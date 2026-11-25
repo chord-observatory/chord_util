@@ -104,10 +104,15 @@ only right for elements 0-7. The mapping is confirmed by the data: the saturated
 (~1e10) gains fall exactly on the inputs that carry no signal (A4, A3 and A1 in
 both polarisations, and RFIA4p1).
 
-The remap is read from the ``dpdk`` section of the receiver configuration
-snapshot in ``/config_json`` when a file records it (see
-:func:`get_crs_board_remap`); otherwise :data:`CRS_BOARD_REMAP` is used. It must
-be updated if the F-engine boards are re-cabled.
+The remap is read from the receiver configuration snapshots in
+``/config_json`` when a file records it (see :func:`get_crs_board_remap`):
+``dpdk.crs_board_remap``, or ``telescope.crs_board_remap`` for the X-engine
+builds from 2026-11-05 on, which no longer write it in the ``dpdk`` section.
+Otherwise :data:`CRS_BOARD_REMAP` is used. The pathfinder was re-cabled in
+October 2026: from acq_20261020 on the files record
+``[0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]``, so the default (the
+September wiring) is wrong for recent data that do not record the remap; with
+it, the X and Y digital gains of dish row H are swapped.
 
 **The size of the gains.** The applied gain is ``gain_coeff``. The archive also
 has a per-input exponent ``gain_exp`` (``gain_coeff * 2**gain_exp``), but the
@@ -1501,8 +1506,10 @@ def get_crs_board_remap(fh):
     """Get the CRS board remap recorded in an X-engine file.
 
     The receiver configuration snapshots in ``/config_json`` record the
-    ``dpdk.crs_board_remap`` setting of the X-engine packet capture in some
-    acquisitions (the first ones), but not in all of them.
+    ``dpdk.crs_board_remap`` setting of the X-engine packet capture in most
+    acquisitions up to 2026-11-03. Later X-engine builds record it only as
+    ``telescope.crs_board_remap``, which is used when no snapshot has the
+    ``dpdk`` entry (the two agree wherever both are present).
 
     Parameters
     ----------
@@ -1523,16 +1530,18 @@ def get_crs_board_remap(fh):
     if "config_json" not in fh:
         return None
 
-    found = set()
+    found = {"dpdk": set(), "telescope": set()}
     for snapshot in fh["config_json"][:]:
         try:
             config = json.loads(snapshot).get("config", {})
         except (ValueError, AttributeError):
             continue
-        remap = config.get("dpdk", {}).get("crs_board_remap", None)
-        if remap is not None:
-            found.add(tuple(int(x) for x in remap))
+        for section, values in found.items():
+            remap = (config.get(section) or {}).get("crs_board_remap", None)
+            if remap is not None:
+                values.add(tuple(int(x) for x in remap))
 
+    found = found["dpdk"] or found["telescope"]
     if len(found) > 1:
         raise AnDataError(f"Inconsistent crs_board_remap in {fh.filename}: {found}")
     return list(found.pop()) if found else None
@@ -1947,9 +1956,11 @@ def _scan_xengine_files(files, normalise_gain=True, crs_board_remap=None):
             raise AnDataError("The crs_board_remap changes within the files.")
     else:
         remap, remap_source = list(CRS_BOARD_REMAP), "default"
-        logger.info(
+        logger.warning(
             "The files do not record the crs_board_remap, using the default "
-            f"{list(CRS_BOARD_REMAP)}."
+            f"{list(CRS_BOARD_REMAP)} (the September 2026 wiring). For data taken "
+            "after the October 2026 re-cabling this swaps the X and Y digital gains "
+            "of dish row H: pass `crs_board_remap` if the files are that recent."
         )
 
     fengine_input = digital_gain_input(input_list, remap)

@@ -71,6 +71,29 @@ def test_get_crs_board_remap(files, tmp_path):
     with h5py.File(fname, "r") as fh:
         assert andata.get_crs_board_remap(fh) is None
 
+    # Recorded only in the telescope section (X-engine builds from 2026-11-05)
+    remap = [0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+    with h5py.File(fname, "w") as fh:
+        snaps = [
+            json.dumps({"config": {"telescope": {"crs_board_remap": remap}}}),
+            json.dumps(
+                {"config": {"dpdk": {}, "telescope": {"crs_board_remap": remap}}}
+            ),
+        ]
+        fh["config_json"] = np.array(snaps, dtype=h5py.string_dtype())
+    with h5py.File(fname, "r") as fh:
+        assert andata.get_crs_board_remap(fh) == remap
+
+    # The dpdk entry takes precedence over the telescope one
+    with h5py.File(fname, "w") as fh:
+        snaps = [
+            json.dumps({"config": {"telescope": {"crs_board_remap": remap}}}),
+            json.dumps({"config": {"dpdk": {"crs_board_remap": list(range(16))}}}),
+        ]
+        fh["config_json"] = np.array(snaps, dtype=h5py.string_dtype())
+    with h5py.File(fname, "r") as fh:
+        assert andata.get_crs_board_remap(fh) == list(range(16))
+
     # Snapshots that disagree
     with h5py.File(fname, "w") as fh:
         snaps = [
