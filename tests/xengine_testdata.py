@@ -45,9 +45,14 @@ DEFAULT_INPUTS = {
 # that ignores it gets the wrong gains
 TEST_CRS_BOARD_REMAP = (3, 5, 0, 2, 4, 6, 8, 15, 7, 1, 9, 11, 13, 10, 12, 14)
 
-# Number of gain archive channels and correlator inputs in the synthetic files
-N_GAIN_FREQ = 2048
+# Number of gain archive channels (0-1600 MHz) and correlator inputs, as in the
+# pathfinder files
+N_GAIN_FREQ = 8192
 N_GAIN_INPUT = 128
+
+# Range of the gain coefficients: real (the CHORD F-engine writes no imaginary
+# part) and ~1e8-1e10, as in the pathfinder gain archives
+GAIN_RANGE = (1e8, 1e10)
 
 
 def _fengine_input(input_list, crs_board_remap):
@@ -82,15 +87,19 @@ def make_xengine_files(
     record_remap=True,
     zero_gain_input=None,
     change_gains=False,
+    complex_gains=False,
     acquisition="acq_20260911_232919_986789057",
     seed=1234,
 ):
     """Write synthetic X-engine files and return the data they encode.
 
-    The true visibilities and weights are random. The raw files hold them with
-    the digital gains applied, ``V_ab = g_a g_b^* V_true``,
-    ``w_ab = w_true / |g_a g_b|^2``, where the gain of each element is taken from
-    the gain archive through `crs_board_remap`.
+    The raw files hold the true data with the digital gains applied,
+    ``V_ab = g_a g_b^* V_true``, ``w_ab = w_true / |g_a g_b|^2``, where the gain of
+    each element is taken from the gain archive through `crs_board_remap`. As for
+    the pathfinder, the gains are real and ~1e8-1e10 and the raw data are of order
+    one, so the true data are random numbers scaled by the gain normalisation
+    (``gain_norm**-2`` for the visibilities, ``gain_norm**4`` for the weights)
+    and are returned in double precision.
 
     Parameters
     ----------
@@ -113,6 +122,9 @@ def make_xengine_files(
         Index of an input whose gain is set to zero.
     change_gains : bool
         Use a different gain update in the last file.
+    complex_gains : bool
+        Give the gains random phases. The F-engine gains are real, but complex
+        gains check the conjugation convention of the readers.
     acquisition : str
         Name of the acquisition directory.
     seed : int
@@ -156,14 +168,6 @@ def make_xengine_files(
         filled[-unfilled_last:] = False
     nfilled = int(filled.sum())
 
-    # True data for the filled samples
-    vis_true = (
-        rng.normal(size=(nfreq, nprod, nfilled))
-        + 1j * rng.normal(size=(nfreq, nprod, nfilled))
-    ).astype(np.complex64)
-    vis_true[:, auto] = rng.uniform(5, 20, size=(nfreq, auto.sum(), nfilled))
-    weight_true = rng.uniform(0.5, 2.0, size=(nfreq, nprod, nfilled)).astype(np.float32)
-
     # Samples with no data: one never received, one fully excised
     missing = np.zeros((nfreq, nfilled), dtype=bool)
     frames_added = np.ones((nfreq, nfilled), dtype=np.uint8)
@@ -186,10 +190,13 @@ def make_xengine_files(
     gain_freq["width"] = CHANNEL_WIDTH_MHZ
 
     def _gain_archive():
-        coeff = (
-            rng.uniform(0.5e3, 2e3, size=(N_GAIN_FREQ, N_GAIN_INPUT))
-            * np.exp(2j * np.pi * rng.uniform(size=(N_GAIN_FREQ, N_GAIN_INPUT)))
-        ).astype(np.complex64)
+        lo, hi = np.log10(GAIN_RANGE)
+        coeff = 10 ** rng.uniform(lo, hi, size=(N_GAIN_FREQ, N_GAIN_INPUT))
+        if complex_gains:
+            coeff = coeff * np.exp(
+                2j * np.pi * rng.uniform(size=(N_GAIN_FREQ, N_GAIN_INPUT))
+            )
+        coeff = coeff.astype(np.complex64)
         if zero_gain_input is not None:
             coeff[:, fengine_input[zero_gain_input]] = 0.0
         return coeff
@@ -210,6 +217,14 @@ def make_xengine_files(
     dish = np.array(inputs["type"]) == INPUT_TYPE_DISH
     g0 = np.abs(applied[0][:, dish])
     gain_norm = float(np.median(g0[g0 > 0]))
+
+    # True data for the filled samples, scaled so that the raw data are of order one
+    vis_true = rng.normal(size=(nfreq, nprod, nfilled)) + 1j * rng.normal(
+        size=(nfreq, nprod, nfilled)
+    )
+    vis_true[:, auto] = rng.uniform(5, 20, size=(nfreq, auto.sum(), nfilled))
+    vis_true /= gain_norm**2
+    weight_true = rng.uniform(0.5, 2.0, size=(nfreq, nprod, nfilled)) * gain_norm**4
 
     # Times
     t_inst_ns = T0_UNIX_NS + np.round(np.arange(ntot) * BIN_S * 1e9).astype(np.int64)
@@ -486,8 +501,9 @@ def _write_file(
         ["config"],
     )
 
-    # Digital gain archive, with gain_exp = -1 on the used inputs (as for the
-    # pathfinder), which readers must ignore
+    # Digital gain archive, with gain_exp = -1 on the used inputs, which readers
+    # must ignore (the F-engine does not apply it; it is 0 or -1 in the pathfinder
+    # files)
     dg = fh.create_group("digital_gains")
     dg.attrs["acquisition_name"] = "test_digitalgain"
     dg.attrs["selected_update_idx"] = 0

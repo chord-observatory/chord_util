@@ -110,14 +110,16 @@ snapshot in ``/config_json`` when a file records it (see
 be updated if the F-engine boards are re-cabled.
 
 **The size of the gains.** The applied gain is ``gain_coeff``. The archive also
-has a per-input exponent ``gain_exp`` (``gain_coeff * 2**gain_exp``), but for
-CHORD the F-engine fixes it to -1 and ignores it (it is there for CHIME), so it
-is not used. The coefficients are ~1e8-1e10, so ``|g|^4`` would overflow the
-float32 weights. The gains are therefore divided by a single number, the median
-``|g|`` of the dish inputs over all frequencies of the first file (saved in the
-``digital_gain_norm`` attribute), before being applied. This only sets the
-overall scale of the data, which calibration fixes later; it does not change
-the relative gains between inputs or frequencies, or the signal to noise.
+has a per-input exponent ``gain_exp`` (``gain_coeff * 2**gain_exp``), but the
+CHORD F-engine does not apply it (it is there for CHIME; it is 0, or -1 on some
+inputs, in the pathfinder files), so it is not used. The coefficients are real
+(stored as complex for compatibility) and ~1e8-1e10, so ``|g|^4`` would
+overflow the float32 weights. The gains are therefore divided by a single
+number, the median ``|g|`` of the dish inputs over all frequencies of the first
+file (saved in the ``digital_gain_norm`` attribute), before being applied.
+This only sets the overall scale of the data, which calibration fixes later; it
+does not change the relative gains between inputs or frequencies, or the signal
+to noise.
 
 Notes
 -----
@@ -1540,8 +1542,8 @@ def read_digital_gains(fh, freq_centre, fengine_input):
     """Read the F-engine digital gains from an X-engine file.
 
     The gain applied to each input is ``gain_coeff``. The exponent
-    ``gain_exp`` in the archive is fixed to -1 and ignored by the CHORD F-engine,
-    so it is not used.
+    ``gain_exp`` in the archive is not applied by the CHORD F-engine, so it is
+    not used.
 
     Parameters
     ----------

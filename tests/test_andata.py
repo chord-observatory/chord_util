@@ -258,6 +258,21 @@ def test_zero_gain_input(tmp_path):
     assert np.all(others[~truth["missing"]] > 0)
 
 
+def test_complex_gains(tmp_path):
+    """Complex gains are divided out with the conjugation V_ab = g_a g_b^* V_true.
+
+    The F-engine gains are real, so only this test checks the convention.
+    """
+    files, truth = testing.make_xengine_files(tmp_path, complex_gains=True, nfile=2)
+    assert np.any(truth["gain"][0].imag != 0)
+    data = andata.CorrData.from_acq_h5(files)
+    np.testing.assert_allclose(data.vis[:], _true_vis(truth, data), rtol=1e-5)
+    raw = andata.CorrData.from_acq_h5(files, apply_gain=False)
+    g = truth["gain"][0]
+    gg = g[:, truth["prod"]["input_a"]] * g[:, truth["prod"]["input_b"]].conj()
+    np.testing.assert_allclose(raw.vis[:], gg[..., None] * truth["vis"], rtol=1e-5)
+
+
 def test_gains_change_between_files(tmp_path):
     """Each file is corrected with its own gains."""
     files, truth = testing.make_xengine_files(tmp_path, change_gains=True)
