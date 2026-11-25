@@ -1,0 +1,106 @@
+# CHORD pathfinder bad inputs: each entry holds from its start time (UTC) until the next one.
+# Written by chord_util.layout.update_feedmask.
+- start: '2026-10-25T23:31:45Z'
+  acquisition: acq_20261025_233145_198439631
+  comment: Extended bad-feed list used for the 10-25 night
+  bad_inputs:
+    B01X: no sky signal (README / inspection)
+    B01Y: no sky signal (README / inspection)
+    B02X: no sky signal (README / inspection)
+    B02Y: no sky signal (README / inspection)
+    B05Y: time-variable autocorrelation (Tsys notebook)
+    B06X: time-variable autocorrelation (Tsys notebook)
+    C08X: no sky signal (README / inspection)
+    C08Y: no sky signal (README / inspection)
+    D04X: no sky signal (README / inspection)
+    D04Y: no sky signal (README / inspection)
+    E01X: no sky signal (README / inspection)
+    E01Y: no sky signal (README / inspection)
+    E05X: time-variable autocorrelation (Tsys notebook)
+    E07X: no sky signal (README / inspection)
+    E07Y: no sky signal (README / inspection)
+    F01X: no sky signal (README / inspection)
+    F01Y: no sky signal (README / inspection)
+    G03X: no sky signal (README / inspection)
+    G03Y: no sky signal (README / inspection)
+    G07X: no sky signal (README / inspection)
+    G07Y: no sky signal (README / inspection)
+- start: '2026-10-29T01:07:09Z'
+  acquisition: acq_20261029_010709_064298776
+  comment: 'Inspection of the night of 2026-10-28/29 (baseband_gains_20261030/inspection_20261029.ipynb,
+    Sec. 9). C02X and G02X flagged by kotekan but healthy with sky signal: kept'
+  bad_inputs:
+    A04Y: autocorrelation jitter 3x normal (z=11-12); level 2x the median
+    B01X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B01Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B02X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B02Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    C08X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    C08Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D04X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D04Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D07X: autocorrelation jitter 2-3x normal (z=15-22)
+    E01X: 'weak sky response: EigenCal gain 4.1x / 2.7x (X / Y) the median, every
+      channel removed by FlagAmplitude'
+    E01Y: 'weak sky response: EigenCal gain 4.1x / 2.7x (X / Y) the median, every
+      channel removed by FlagAmplitude'
+    E02Y: 'hot: autocorrelation 13x the median, no sky signal; flagged by kotekan'
+    E07X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    E07Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    F01X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    F01Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    G03X: autocorrelation 0.19-0.4 of the median below 700 MHz
+    G07X: bursts in the autocorrelation (11% peak-to-peak)
+    G07Y: autocorrelation 0.03-0.3 of the median; jitter; bursts 11-14%
+- start: '2026-11-01T01:48:34Z'
+  acquisition: acq_20261101_014834_710489386
+  comment: Inspection of the night of 2026-10-31/11-01 (baseband_gains_20261030/inspection_20261101.ipynb,
+    Sec. 9). G07X passes the tests on this night (masked on 10-29 and 11-06)
+  bad_inputs:
+    A04Y: autocorrelation jitter 3x normal (z=11-12); level 2x the median
+    B01X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B01Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B02X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    B02Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    C08X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    C08Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D04X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D04Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    D07X: autocorrelation jitter 2-3x normal (z=15-22)
+    E01X: 'weak sky response: EigenCal gain 4.0x / 2.6x (X / Y) the median, every
+      channel removed by FlagAmplitude'
+    E01Y: 'weak sky response: EigenCal gain 4.0x / 2.6x (X / Y) the median, every
+      channel removed by FlagAmplitude'
+    E07X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    E07Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    F01X: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    F01Y: no fringes at the Tau A transit (README / inspection); flagged by kotekan
+    G03X: autocorrelation 0.19-0.4 of the median below 700 MHz
+    G07Y: autocorrelation 0.03-0.3 of the median; jitter; bursts 11-14%
+- start: '2026-11-06T02:21:35Z'
+  acquisition: acq_20261106_022138_583192542
+  comment: Inspection of the night of 2026-11-05/06 (inspection_20261106.ipynb, Sec.
+    9)
+  bad_inputs:
+    A02X: no fringes at the Tau A transit (README); flagged by kotekan
+    A02Y: no fringes at the Tau A transit (README); flagged by kotekan
+    A04Y: autocorrelation jitter 3x normal and a step at +6 h; level up to 2.8x the
+      median
+    B01X: no fringes at the Tau A transit (README); flagged by kotekan
+    B01Y: no fringes at the Tau A transit (README); flagged by kotekan
+    B02X: no fringes at the Tau A transit (README); flagged by kotekan
+    B02Y: no fringes at the Tau A transit (README); flagged by kotekan
+    B04X: flagged by kotekan 73% of the time; jitter and bursts in the autocorrelation
+    B04Y: flagged by kotekan 89% of the time; autocorrelation erratic (rms 7-18%)
+    C08X: no fringes at the Tau A transit (README); flagged by kotekan
+    C08Y: no fringes at the Tau A transit (README); flagged by kotekan
+    D04X: no fringes at the Tau A transit (README); flagged by kotekan
+    D04Y: no fringes at the Tau A transit (README); flagged by kotekan
+    D07X: autocorrelation jitter 3-4x normal
+    E07X: no fringes at the Tau A transit (README); flagged by kotekan
+    E07Y: no fringes at the Tau A transit (README); flagged by kotekan
+    F01X: no fringes at the Tau A transit (README); flagged by kotekan
+    F01Y: no fringes at the Tau A transit (README); flagged by kotekan
+    G03X: autocorrelation 0.14-0.4 of the median below 700 MHz
+    G07X: bursts in the autocorrelation (45% peak-to-peak at 1000-1020 MHz)
+    G07Y: autocorrelation 0.03-0.5 of the median; bursts
