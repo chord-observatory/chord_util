@@ -1,17 +1,4 @@
-"""Utility functions for calibration.
-
-- Robust statistics and outlier flagging (`estimate_directional_scale`,
-  `flag_outliers`).
-- Models fitted to the response of each input to a point source transit
-  (`FitTransit` and its subclasses `FitGaussAmpPolyPhase` and
-  `FitPolyLogAmpPolyPhase`).
-- Interpolation of the gains over flagged frequencies with a Gaussian process
-  (`interpolate_gain`, `interpolate_gain_quiet`).
-
-These are the functions of ``ch_util.cal_utils`` used by the CHIME calibration,
-without the parts that depend on the CHIME database, as ported to the draco
-``eigencal`` branch.
-"""
+"""Utility functions for calibration"""
 
 import logging
 from abc import ABCMeta, abstractmethod
