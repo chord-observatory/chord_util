@@ -7,6 +7,7 @@ General CHORD utilities.
   container, laid out like `ch_util.andata.CorrData`. Includes `CorrReader`
   for selecting data before reading, and the F-engine digital gain handling.
 - `chord_util.rfi`: RFI tools (placeholder for the static RFI mask).
+- `chord_util.cal_utils`: calibration utilities for Eigen-Calibration.
 
 ## Installation
 
