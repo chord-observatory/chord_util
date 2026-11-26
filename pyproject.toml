@@ -19,6 +19,7 @@ dependencies = [
     "mpi4py",
     "numpy >= 1.24",
     "pyyaml",
+    "scipy",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,10 @@ doc = [
     "numpydoc",
     "Sphinx",
     "sphinx_rtd_theme",
+]
+calibration = [
+    # Gaussian process interpolation of the gains, chord_util.cal_utils.interpolate_gain
+    "scikit-learn",
 ]
 rfi = [
     # SumThreshold and SIR, used by chord_util.rfi.mad_sumthreshold_mask

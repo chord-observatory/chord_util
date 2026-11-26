@@ -7,6 +7,10 @@ General CHORD utilities.
   container, laid out like `ch_util.andata.CorrData`. Includes `CorrReader`
   for selecting data before reading, and the F-engine digital gain handling.
 - `chord_util.rfi`: RFI tools (placeholder for the static RFI mask).
+- `chord_util.cal_utils`: calibration utilities, as in `ch_util.cal_utils`:
+  models fitted to point source transits, outlier flagging, and the Gaussian
+  process interpolation of the gains over frequency (needs the `calibration`
+  extra, `pip install -e .[calibration]`).
 
 ## Installation
 
